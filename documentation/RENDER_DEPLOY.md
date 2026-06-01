@@ -14,6 +14,12 @@ Render blueprint:
 render.yaml
 ```
 
+Python version pin:
+
+```text
+.python-version
+```
+
 Backend entry point:
 
 ```text
@@ -32,6 +38,8 @@ If creating the service manually in Render, use these settings.
 | Build Command | `pip install -r backend/requirements.txt` |
 | Start Command | `uvicorn backend.main:app --host 0.0.0.0 --port $PORT` |
 | Health Check Path | `/health` |
+
+The repository pins Python to `3.12` using `.python-version`. This avoids Render's newer Python default trying to compile packages such as `pydantic-core` from source.
 
 ## Environment Variables
 
@@ -74,6 +82,24 @@ Example:
 ```text
 https://your-frontend-domain.com,http://localhost:3000,http://127.0.0.1:3000
 ```
+
+## AI Service On Render
+
+The main Render backend should not load `plant.pt` directly for the MVP. Keep this backend focused on API routes, Supabase, DeepSeek, and access limits.
+
+For Plant Health, deploy YOLOv8 as a separate inference service that loads `plant.pt`, then set:
+
+```text
+YOLOV8_ENDPOINT=https://your-yolo-service.com/analyze
+```
+
+Keep the raw training dataset outside the Render backend repository. For local testing only, model weights can sit at:
+
+```text
+backend/ml/models/plant.pt
+```
+
+See [AI_SERVICE.md](AI_SERVICE.md) for the full hybrid YOLOv8 + DeepSeek setup.
 
 ## Firebase Private Key Note
 

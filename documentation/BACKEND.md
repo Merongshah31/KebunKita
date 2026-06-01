@@ -129,3 +129,17 @@ uvicorn backend.main:app --host 0.0.0.0 --port $PORT
 ```
 
 See [RENDER_DEPLOY.md](RENDER_DEPLOY.md) for full deployment steps.
+
+## AI Service
+
+The backend expects YOLOv8 inference through `YOLOV8_ENDPOINT`.
+
+For local AI development, the trained YOLOv8 weights can be placed at:
+
+```text
+backend/ml/models/plant.pt
+```
+
+Do not commit `plant.pt` to GitHub. For production, deploy a separate YOLO inference service that loads `plant.pt`, then set `YOLOV8_ENDPOINT` in Render.
+
+See [AI_SERVICE.md](AI_SERVICE.md) for the full hybrid YOLOv8 + DeepSeek flow.

@@ -92,6 +92,7 @@ See [DOCUMENT.md](DOCUMENT.md) for the full architecture diagram and live reques
 - [USERFLOW.md](USERFLOW.md): guest, premium, and feature-level user flows.
 - [DESIGN.md](DESIGN.md): frontend visual direction, screen inventory, and UI guidelines.
 - [AGENTS.md](AGENTS.md): agent roles, flows, inputs, outputs, memory, and guardrails.
+- [AI_SERVICE.md](AI_SERVICE.md): YOLOv8 `plant.pt`, DeepSeek hybrid flow, and AI service deployment guidance.
 
 ## Current Development Focus
 
