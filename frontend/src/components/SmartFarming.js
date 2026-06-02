@@ -1,114 +1,132 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { apiService } from '../api/client';
 import '../styles/agents.css';
 
 export default function SmartFarming({ userId, onError }) {
-  const [cropType, setCropType] = useState('');
-  const [areaSize, setAreaSize] = useState('');
-  const [soilType, setSoilType] = useState('');
-  const [waterSource, setWaterSource] = useState('');
+  const [plantName, setPlantName] = useState('Birds Eye Chili');
+  const [budgetRm, setBudgetRm] = useState('50');
   const [loading, setLoading] = useState(false);
+  const [creatingPlant, setCreatingPlant] = useState(false);
   const [result, setResult] = useState(null);
+  const [plants, setPlants] = useState([]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!cropType || !areaSize) {
-      onError('Crop type and area size are required');
-      return;
+  const refreshPlants = async () => {
+    try {
+      const response = await apiService.listPlants(userId);
+      setPlants(response.data);
+    } catch {
+      setPlants([]);
     }
-    if (!userId) {
-      onError('User ID is required');
-      return;
-    }
+  };
 
+  useEffect(() => {
+    refreshPlants();
+  }, [userId]);
+
+  const handlePlan = async (event) => {
+    event.preventDefault();
     setLoading(true);
     try {
-      const response = await apiService.createFarmingPlan(
-        userId,
-        cropType,
-        parseFloat(areaSize),
-        soilType,
-        waterSource
-      );
+      const response = await apiService.createFarmingPlan(userId, plantName, budgetRm);
       setResult(response.data);
-      setCropType('');
-      setAreaSize('');
-      setSoilType('');
-      setWaterSource('');
     } catch (error) {
-      onError(`Error: ${error.debugInfo?.message} (${error.debugInfo?.status})`);
+      onError(`Care plan failed: ${error.debugInfo?.message || error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <div className="agent-panel">
-      <h2>ðŸšœ Smart Farming Plan</h2>
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Crop Type</label>
-          <input
-            type="text"
-            value={cropType}
-            onChange={(e) => setCropType(e.target.value)}
-            placeholder="e.g., Tomato, Rice, Corn"
-            disabled={loading}
-          />
-        </div>
+  const handleAddPlant = async () => {
+    setCreatingPlant(true);
+    try {
+      await apiService.createPlant({
+        user_id: userId,
+        name: plantName,
+        plant_type: 'vegetable',
+        variety: plantName,
+        garden_location: 'Balcony',
+        sunlight_requirement: 'Full sun',
+        watering_frequency: 'Daily',
+      });
+      await refreshPlants();
+    } catch (error) {
+      onError(`Add plant failed: ${error.debugInfo?.message || error.message}`);
+    } finally {
+      setCreatingPlant(false);
+    }
+  };
 
-        <div className="form-group">
-          <label>Area Size (hectares)</label>
+  const handleWater = async (plantId) => {
+    try {
+      await apiService.waterPlant(plantId, userId);
+      await refreshPlants();
+    } catch (error) {
+      onError(`Water log failed: ${error.debugInfo?.message || error.message}`);
+    }
+  };
+
+  return (
+    <article className="agent-panel">
+      <div className="agent-title">
+        <div>
+          <span className="agent-kicker">Garden assistant</span>
+          <h3>Generate today care tasks</h3>
+        </div>
+        <button className="secondary-button" type="button" onClick={handleAddPlant} disabled={creatingPlant}>
+          {creatingPlant ? 'Adding...' : 'Add plant'}
+        </button>
+      </div>
+
+      <form className="agent-form two-column" onSubmit={handlePlan}>
+        <label>
+          Plant name
+          <input value={plantName} onChange={(event) => setPlantName(event.target.value)} />
+        </label>
+        <label>
+          Budget RM
           <input
             type="number"
-            step="0.1"
-            value={areaSize}
-            onChange={(e) => setAreaSize(e.target.value)}
-            placeholder="e.g., 2.5"
-            disabled={loading}
+            min="0"
+            value={budgetRm}
+            onChange={(event) => setBudgetRm(event.target.value)}
           />
-        </div>
-
-        <div className="form-group">
-          <label>Soil Type (optional)</label>
-          <input
-            type="text"
-            value={soilType}
-            onChange={(e) => setSoilType(e.target.value)}
-            placeholder="e.g., Clay loam, Sandy"
-            disabled={loading}
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Water Source (optional)</label>
-          <input
-            type="text"
-            value={waterSource}
-            onChange={(e) => setWaterSource(e.target.value)}
-            placeholder="e.g., Rain-fed, Irrigation"
-            disabled={loading}
-          />
-        </div>
-
-        <button type="submit" disabled={loading}>
-          {loading ? 'Creating plan...' : 'Create Farming Plan'}
+        </label>
+        <button className="primary-button" disabled={loading} type="submit">
+          {loading ? 'Planning...' : 'Generate care plan'}
         </button>
       </form>
 
-      {result && (
-        <div className="result-box">
-          <h3>Farming Plan</h3>
-          <p><strong>Plan:</strong> {result.plan}</p>
-          {result.estimated_yield && (
-            <p><strong>Estimated Yield:</strong> {result.estimated_yield}</p>
-          )}
-          {result.telegram_hint && (
-            <p className="hint">ðŸ“² Telegram updates will be sent to track progress</p>
-          )}
-          {result.memory_ref && <p className="memory-ref">ðŸ“š Memory ID: {result.memory_ref}</p>}
+      {plants.length > 0 && (
+        <div className="plant-grid">
+          {plants.map((plant) => (
+            <div className="garden-card" key={plant.id}>
+              <div>
+                <strong>{plant.name}</strong>
+                <span>{plant.growth_percent || 0} percent grown</span>
+              </div>
+              <button type="button" onClick={() => handleWater(plant.id)}>
+                Log water
+              </button>
+            </div>
+          ))}
         </div>
       )}
-    </div>
+
+      {result && (
+        <div className="result-card">
+          <h4>{result.plant_name} tasks</h4>
+          <div className="task-list">
+            {result.tasks.map((task) => (
+              <div className="task-item" key={`${task.time}-${task.task}`}>
+                <span>{task.time}</span>
+                <strong>{task.task}</strong>
+                <p>{task.reason}</p>
+              </div>
+            ))}
+          </div>
+          <small>{result.telegram_hint}</small>
+        </div>
+      )}
+    </article>
   );
 }

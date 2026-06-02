@@ -2,98 +2,95 @@ import React, { useState } from 'react';
 import { apiService } from '../api/client';
 import '../styles/agents.css';
 
+const listings = [
+  {
+    title: 'Fresh Red Chillies',
+    owner: 'Abu Bakar',
+    distance: '0.8km',
+    image: 'https://images.unsplash.com/photo-1588252303782-cb80119abd6d?auto=format&fit=crop&w=700&q=80',
+  },
+  {
+    title: 'Baby Carrots',
+    owner: 'Siti Aminah',
+    distance: '2.4km',
+    image: 'https://images.unsplash.com/photo-1447175008436-1701707eb8a3?auto=format&fit=crop&w=700&q=80',
+  },
+];
+
 export default function CommunityExchange({ userId, onError }) {
-  const [cropName, setCropName] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [location, setLocation] = useState('');
+  const [title, setTitle] = useState('2kg Kangkung');
+  const [quantity, setQuantity] = useState('2kg');
+  const [location, setLocation] = useState('Tanjung Malim');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!cropName || !quantity) {
-      onError('Crop name and quantity are required');
-      return;
-    }
-    if (!userId) {
-      onError('User ID is required');
-      return;
-    }
-
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setLoading(true);
     try {
-      const response = await apiService.matchHarvest(
-        userId,
-        cropName,
-        quantity,
-        location
-      );
+      const response = await apiService.matchHarvest(userId, title, quantity, location);
       setResult(response.data);
-      setCropName('');
-      setQuantity('');
-      setLocation('');
     } catch (error) {
-      onError(`Error: ${error.debugInfo?.message} (${error.debugInfo?.status})`);
+      onError(`Exchange failed: ${error.debugInfo?.message || error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="agent-panel">
-      <h2>ðŸ¤ Community Harvest Exchange</h2>
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Crop Name</label>
-          <input
-            type="text"
-            value={cropName}
-            onChange={(e) => setCropName(e.target.value)}
-            placeholder="e.g., Tomato, Cucumber, Lettuce"
-            disabled={loading}
-          />
+    <article className="agent-panel">
+      <div className="agent-title">
+        <div>
+          <span className="agent-kicker">Community exchange</span>
+          <h3>Post a harvest for barter</h3>
         </div>
+        <span className="agent-badge">Local matches</span>
+      </div>
 
-        <div className="form-group">
-          <label>Quantity</label>
-          <input
-            type="text"
-            value={quantity}
-            onChange={(e) => setQuantity(e.target.value)}
-            placeholder="e.g., 50kg, 100 bundles"
-            disabled={loading}
-          />
-        </div>
+      <div className="market-strip">
+        {listings.map((listing) => (
+          <article key={listing.title}>
+            <img src={listing.image} alt={listing.title} />
+            <strong>{listing.title}</strong>
+            <span>{listing.owner} - {listing.distance}</span>
+          </article>
+        ))}
+      </div>
 
-        <div className="form-group">
-          <label>Location (optional)</label>
-          <input
-            type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="e.g., Selangor, Kuala Lumpur"
-            disabled={loading}
-          />
-        </div>
-
-        <button type="submit" disabled={loading}>
-          {loading ? 'Matching...' : 'Find Matching Harvest'}
+      <form className="agent-form two-column" onSubmit={handleSubmit}>
+        <label>
+          Listing title
+          <input value={title} onChange={(event) => setTitle(event.target.value)} />
+        </label>
+        <label>
+          Quantity
+          <input value={quantity} onChange={(event) => setQuantity(event.target.value)} />
+        </label>
+        <label>
+          Area
+          <input value={location} onChange={(event) => setLocation(event.target.value)} />
+        </label>
+        <button className="primary-button" disabled={loading} type="submit">
+          {loading ? 'Finding matches...' : 'Find barter matches'}
         </button>
       </form>
 
       {result && (
-        <div className="result-box">
-          <h3>Matching Results</h3>
-          <p><strong>Match Status:</strong> {result.match_status}</p>
-          {result.matched_farms && (
-            <p><strong>Matched Farms:</strong> {result.matched_farms}</p>
-          )}
-          {result.contact_info && (
-            <p><strong>Contact:</strong> {result.contact_info}</p>
-          )}
-          {result.memory_ref && <p className="memory-ref">ðŸ“š Memory ID: {result.memory_ref}</p>}
+        <div className="result-card">
+          <h4>Suggested matches</h4>
+          <p>Post ID: {result.post_id}</p>
+          <div className="match-list">
+            {result.matches.map((match) => (
+              <div className="match-item" key={match.match_user}>
+                <strong>{match.match_user}</strong>
+                <span>{Math.round(match.score * 100)} percent fit</span>
+                <p>{match.reason}</p>
+              </div>
+            ))}
+          </div>
+          <small>{result.memory_ref}</small>
         </div>
       )}
-    </div>
+    </article>
   );
 }

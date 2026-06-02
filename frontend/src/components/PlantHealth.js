@@ -3,86 +3,104 @@ import { apiService } from '../api/client';
 import '../styles/agents.css';
 
 export default function PlantHealth({ userId, onError }) {
-  const [imageName, setImageName] = useState('');
   const [imageFile, setImageFile] = useState(null);
-  const [notes, setNotes] = useState('');
+  const [preview, setPreview] = useState('');
+  const [notes, setNotes] = useState('Brown spots on chili leaves');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
-  const handleImageSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setImageFile(file);
-      setImageName(file.name);
-    }
+  const handleImageSelect = (event) => {
+    const file = event.target.files[0];
+    setImageFile(file || null);
+    setPreview(file ? URL.createObjectURL(file) : '');
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     if (!imageFile) {
-      onError('Please select an image');
-      return;
-    }
-    if (!userId) {
-      onError('User ID is required');
+      onError('Please choose a plant image first.');
       return;
     }
 
     setLoading(true);
     try {
-      const response = await apiService.analyzePlant(userId, imageName, imageFile, notes);
+      const response = await apiService.analyzePlant(userId, imageFile, notes);
       setResult(response.data);
-      setImageFile(null);
-      setImageName('');
-      setNotes('');
     } catch (error) {
-      onError(`Error: ${error.debugInfo?.message} (${error.debugInfo?.status})`);
+      onError(`Plant analysis failed: ${error.debugInfo?.message || error.message}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="agent-panel">
-      <h2>🌱 Plant Health Analysis</h2>
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label>Upload Plant Image</label>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleImageSelect}
-            disabled={loading}
-          />
-          {imageName && <p className="file-name">Selected: {imageName}</p>}
+    <article className="agent-panel">
+      <div className="agent-title">
+        <div>
+          <span className="agent-kicker">AI plant health</span>
+          <h3>Upload a leaf photo</h3>
         </div>
+        <span className="agent-badge">YOLOv8 + DeepSeek</span>
+      </div>
 
-        <div className="form-group">
-          <label>Notes (optional)</label>
+      <form className="agent-form" onSubmit={handleSubmit}>
+        <label className="upload-zone">
+          {preview ? (
+            <img src={preview} alt="Selected plant preview" />
+          ) : (
+            <span>Tap to choose a plant image</span>
+          )}
+          <input type="file" accept="image/*" onChange={handleImageSelect} />
+        </label>
+
+        <label>
+          Field notes
           <textarea
             value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            placeholder="e.g., Wilting leaves, brown spots..."
-            disabled={loading}
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder="Describe symptoms, watering pattern, or location."
           />
-        </div>
+        </label>
 
-        <button type="submit" disabled={loading}>
-          {loading ? 'Analyzing...' : 'Analyze Plant'}
+        <button className="primary-button" disabled={loading} type="submit">
+          {loading ? 'Analyzing plant...' : 'Analyze plant'}
         </button>
       </form>
 
       {result && (
-        <div className="result-box">
-          <h3>Analysis Result</h3>
-          <p><strong>Status:</strong> {result.status}</p>
-          {result.disease_name && <p><strong>Disease:</strong> {result.disease_name}</p>}
-          {result.confidence && <p><strong>Confidence:</strong> {(result.confidence * 100).toFixed(0)}%</p>}
-          {result.symptoms && <p><strong>Symptoms:</strong> {result.symptoms}</p>}
-          {result.treatment_plan && <p><strong>Treatment:</strong> {result.treatment_plan}</p>}
-          {result.memory_ref && <p className="memory-ref">📚 Memory ID: {result.memory_ref}</p>}
-        </div>
+        <ResultCard title="Diagnosis">
+          <div className="status-row">
+            <strong>{result.status}</strong>
+            <span>{Math.round((result.confidence || 0) * 100)} percent confidence</span>
+          </div>
+          {result.disease_name && <p>{result.disease_name}</p>}
+          <List label="Symptoms" items={result.symptoms} />
+          <List label="Treatment" items={result.treatment_plan} />
+          <p>{result.recommendation}</p>
+          <small>{result.memory_ref}</small>
+        </ResultCard>
       )}
+    </article>
+  );
+}
+
+function ResultCard({ title, children }) {
+  return (
+    <div className="result-card">
+      <h4>{title}</h4>
+      {children}
+    </div>
+  );
+}
+
+function List({ label, items }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="mini-list">
+      <strong>{label}</strong>
+      {items.map((item) => (
+        <span key={item}>{item}</span>
+      ))}
     </div>
   );
 }

@@ -1,198 +1,109 @@
 .debug-console {
   position: fixed;
-  bottom: 0;
-  right: 0;
-  width: 100%;
-  max-width: 600px;
-  background: white;
-  border: 2px solid #333;
-  border-radius: 0.5rem 0.5rem 0 0;
-  box-shadow: 0 -5px 20px rgba(0, 0, 0, 0.3);
-  z-index: 999;
-  font-family: 'Courier New', monospace;
-  font-size: 0.85rem;
-  max-height: 40vh;
+  right: 18px;
+  bottom: 18px;
+  z-index: 30;
+  width: min(560px, calc(100vw - 36px));
+  border: 1px solid #cfd9cd;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 45px rgba(35, 54, 41, 0.18);
+  overflow: hidden;
 }
 
 .debug-console.collapsed {
-  max-height: 50px;
+  width: auto;
 }
 
 .debug-header {
-  background: #333;
-  color: #00ff00;
-  padding: 0.75rem;
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  background: #173c26;
+  color: #ffffff;
+  padding: 0 14px;
+  font-weight: 800;
   cursor: pointer;
-  font-weight: 600;
-  user-select: none;
-}
-
-.debug-header:hover {
-  background: #444;
-}
-
-.debug-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.toggle-btn {
-  font-size: 0.7rem;
 }
 
 .debug-content {
-  display: flex;
-  flex-direction: column;
-  height: calc(40vh - 50px);
-  overflow: hidden;
-  background: #1e1e1e;
-  color: #d4d4d4;
+  display: grid;
+  gap: 10px;
+  max-height: 360px;
+  padding: 12px;
+  background: #f4f7f2;
 }
 
 .debug-controls {
   display: flex;
-  gap: 0.5rem;
-  padding: 0.75rem;
-  background: #2d2d2d;
-  border-bottom: 1px solid #444;
   flex-wrap: wrap;
+  gap: 8px;
 }
 
 .debug-controls button {
-  padding: 0.3rem 0.75rem;
-  background: #0d47a1;
-  color: #fff;
-  border: none;
-  border-radius: 0.3rem;
+  min-height: 34px;
+  border: 1px solid #3f7d4d;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #28613d;
+  padding: 0 12px;
+  font-weight: 800;
   cursor: pointer;
-  font-size: 0.8rem;
-  font-family: 'Courier New', monospace;
-  transition: background 0.2s;
-}
-
-.debug-controls button:hover {
-  background: #1565c0;
-}
-
-.guardrail-info {
-  padding: 0.75rem;
-  border-bottom: 1px solid #444;
-  background: #252526;
-  max-height: 40%;
-  overflow-y: auto;
-}
-
-.guardrail-info h4 {
-  color: #00ff00;
-  margin-bottom: 0.5rem;
-}
-
-.guardrail-info pre {
-  background: #1e1e1e;
-  padding: 0.5rem;
-  border-radius: 0.3rem;
-  overflow-x: auto;
-  font-size: 0.75rem;
-  color: #d4d4d4;
 }
 
 .debug-logs {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 0.75rem;
-}
-
-.debug-logs h4 {
-  color: #00ff00;
-  margin-bottom: 0.5rem;
-  font-size: 0.85rem;
-}
-
-.log-list {
-  flex: 1;
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
   overflow-y: auto;
-  font-size: 0.8rem;
-  line-height: 1.4;
 }
 
 .empty {
-  color: #888;
-  font-style: italic;
+  color: #778176;
 }
 
 .log-entry {
-  margin-bottom: 0.3rem;
-  padding: 0.3rem;
-  border-radius: 0.2rem;
-  display: flex;
-  gap: 0.5rem;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 76px 56px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 10px;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #4e5a50;
+  font-size: 12px;
 }
 
-.log-entry.log {
-  color: #00ff00;
+.log-entry strong {
+  color: #28613d;
+  text-transform: uppercase;
 }
 
-.log-entry.error {
-  color: #ff6b6b;
-  background: rgba(255, 107, 107, 0.1);
+.log-entry.error strong {
+  color: #9c2f22;
 }
 
-.log-entry.info {
-  color: #4da6ff;
+.log-entry p {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
-.log-time {
-  color: #888;
-  min-width: 50px;
-  text-align: right;
-}
-
-.log-type {
-  min-width: 70px;
-  font-weight: bold;
-}
-
-.log-message {
-  flex: 1;
-  word-break: break-all;
-  white-space: pre-wrap;
-}
-
-@media (max-width: 768px) {
+@media (max-width: 640px) {
   .debug-console {
-    max-width: 100%;
+    right: 10px;
+    bottom: 10px;
+    width: calc(100vw - 20px);
   }
 
-  .debug-controls {
-    flex-direction: column;
+  .debug-console.collapsed {
+    width: calc(100vw - 20px);
   }
 
-  .debug-controls button {
-    width: 100%;
+  .log-entry {
+    grid-template-columns: 1fr;
   }
-}
-
-/* Scrollbar styling */
-.log-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.log-list::-webkit-scrollbar-track {
-  background: #2d2d2d;
-}
-
-.log-list::-webkit-scrollbar-thumb {
-  background: #555;
-  border-radius: 3px;
-}
-
-.log-list::-webkit-scrollbar-thumb:hover {
-  background: #777;
 }
