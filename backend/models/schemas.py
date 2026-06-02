@@ -299,6 +299,20 @@ class ChatMessageResponse(BaseModel):
     created_at: str
 
 
+class ChatbotReplyRequest(BaseModel):
+    chatRoomId: str
+    ownerName: str
+    itemName: str
+    quantity: str | None = None
+    listingType: str | None = None
+    preferredItems: list[str] = Field(default_factory=list)
+    userMessage: str
+
+
+class ChatbotReplyResponse(BaseModel):
+    reply: str
+
+
 class PlantDiagnosisHistoryResponse(BaseModel):
     id: str
     status: str

@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 from backend.api.agents_api import router as agents_router
 from backend.api.auth_api import router as auth_router
+from backend.api.chatbot_api import router as chatbot_router
 from backend.api.community_api import router as community_router
 from backend.api.notifications_api import router as notifications_router
 from backend.api.plants_api import router as plants_router
@@ -56,6 +57,7 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(community_router)
+app.include_router(chatbot_router)
 app.include_router(agents_router)
 app.include_router(plants_router)
 app.include_router(notifications_router)
