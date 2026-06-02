@@ -140,6 +140,14 @@ class SupabaseClient:
             {"Prefer": "return=representation"},
         ) or []
 
+    def delete(self, table: str, filters: dict[str, Any]) -> list[dict[str, Any]]:
+        query = urlencode({key: f"eq.{value}" for key, value in filters.items()})
+        return self._request(
+            "DELETE",
+            f"/rest/v1/{quote(table)}?{query}",
+            headers={"Prefer": "return=representation"},
+        ) or []
+
     def upsert(
         self,
         table: str,

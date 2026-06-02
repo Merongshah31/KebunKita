@@ -46,9 +46,13 @@ def get_user(user_id: str) -> dict[str, Any]:
             users = supabase_client.select("users", filters={"id": user_id}, limit=1)
             if users:
                 return users[0]
-        except SupabaseError:
-            pass
-    return _local_users.get(user_id, {"id": user_id, "access_type": "guest", "is_guest": True})
+        except SupabaseError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=404, detail="User not found")
+    user = _local_users.get(user_id)
+    if user:
+        return user
+    raise HTTPException(status_code=404, detail="User not found")
 
 
 def ensure_access(user_id: str, function_name: str, activity_name: str) -> dict[str, Any]:

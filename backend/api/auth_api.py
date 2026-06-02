@@ -36,15 +36,23 @@ async def create_guest(payload: GuestCreateRequest) -> UserProfileResponse:
                 user = rows[0]
         except SupabaseError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
-    else:
-        remember_local_user(user)
+    remember_local_user(user)
 
     return UserProfileResponse(**_stringify_dates(user))
 
 
 @router.get("/users/{user_id}", response_model=UserProfileResponse)
 async def read_user(user_id: str) -> UserProfileResponse:
-    user = get_user(user_id)
+    if supabase_client.is_configured():
+        try:
+            rows = supabase_client.select("users", filters={"id": user_id}, limit=1)
+        except SupabaseError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        if not rows:
+            raise HTTPException(status_code=404, detail="User not found")
+        user = rows[0]
+    else:
+        user = get_user(user_id)
     return UserProfileResponse(**_stringify_dates(user))
 
 

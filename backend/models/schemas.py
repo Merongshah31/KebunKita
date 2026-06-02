@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class PlantHealthRequest(BaseModel):
@@ -113,45 +113,63 @@ class UserProfileResponse(BaseModel):
 
 
 class PlantCreateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     user_id: str
     name: str
-    plant_type: str = Field(default="vegetable")
-    variety: str | None = None
-    photo_url: str | None = None
-    date_planted: str | None = None
-    garden_location: str | None = None
-    sunlight_requirement: str | None = None
+    community_id: str | None = None
+    category: str = Field(default="vegetable", validation_alias=AliasChoices("category", "plant_type"))
+    image_url: str | None = Field(default=None, validation_alias=AliasChoices("image_url", "photo_url"))
+    planted_date: str | None = Field(default=None, validation_alias=AliasChoices("planted_date", "date_planted"))
+    location: str | None = Field(default=None, validation_alias=AliasChoices("location", "garden_location"))
+    sunlight: str | None = Field(default=None, validation_alias=AliasChoices("sunlight", "sunlight_requirement"))
     watering_frequency: str | None = None
 
 
 class PlantUpdateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     name: str | None = None
-    plant_type: str | None = None
-    variety: str | None = None
-    photo_url: str | None = None
-    date_planted: str | None = None
-    garden_location: str | None = None
-    growth_percent: int | None = None
-    status: str | None = None
-    sunlight_requirement: str | None = None
+    community_id: str | None = None
+    category: str | None = Field(default=None, validation_alias=AliasChoices("category", "plant_type"))
+    image_url: str | None = Field(default=None, validation_alias=AliasChoices("image_url", "photo_url"))
+    planted_date: str | None = Field(default=None, validation_alias=AliasChoices("planted_date", "date_planted"))
+    location: str | None = Field(default=None, validation_alias=AliasChoices("location", "garden_location"))
+    sunlight: str | None = Field(default=None, validation_alias=AliasChoices("sunlight", "sunlight_requirement"))
     watering_frequency: str | None = None
-    next_watering_at: str | None = None
+    growth_percentage: int | None = Field(default=None, validation_alias=AliasChoices("growth_percentage", "growth_percent"))
+    estimated_harvest_date: str | None = None
+    status: str | None = None
 
 
 class PlantResponse(BaseModel):
     id: str
     user_id: str
+    community_id: str | None = None
     name: str
-    plant_type: str
-    variety: str | None = None
-    photo_url: str | None = None
-    date_planted: str | None = None
-    garden_location: str | None = None
-    growth_percent: int = 0
-    status: str
-    sunlight_requirement: str | None = None
+    category: str
+    image_url: str | None = None
+    planted_date: str | None = None
+    location: str | None = None
+    sunlight: str | None = None
     watering_frequency: str | None = None
-    next_watering_at: str | None = None
+    growth_percentage: int = 0
+    estimated_harvest_date: str | None = None
+    status: str
+
+
+class CareLogCreateRequest(BaseModel):
+    user_id: str
+    action_type: Literal["watered", "fertilized", "note", "inspected", "diagnosed"]
+    note: str | None = None
+
+
+class CareLogResponse(BaseModel):
+    id: str
+    plant_id: str
+    action_type: str
+    note: str | None = None
+    created_at: str
 
 
 class WaterLogRequest(BaseModel):
@@ -186,3 +204,106 @@ class NotificationResponse(BaseModel):
     status: str
     fcm_message_id: str | None = None
     error_message: str | None = None
+
+
+class CommunityFeedPostResponse(BaseModel):
+    id: str
+    type: str
+    user_name: str
+    community_name: str
+    timestamp: str
+    avatar_url: str | None = None
+    image_url: str | None = None
+    caption: str
+    likes: int = 0
+    comments: int = 0
+
+
+class CommunityFeedCreateRequest(BaseModel):
+    user_id: str
+    post_type: str
+    caption: str
+    image_url: str | None = None
+    community_id: str | None = None
+
+
+class MarketplaceListingResponse(BaseModel):
+    id: str
+    item_name: str
+    owner_id: str | None = None
+    owner_name: str
+    area: str | None = None
+    distance: str | None = None
+    quantity: str | None = None
+    listing_type: str
+    requested_item: str | None = None
+    image_url: str | None = None
+
+
+class MarketplaceListingCreateRequest(BaseModel):
+    user_id: str
+    item_name: str
+    quantity: str
+    area: str | None = None
+    listing_type: str
+    requested_item: str | None = None
+    image_url: str | None = None
+
+
+class CommunitySummaryResponse(BaseModel):
+    id: str
+    name: str
+    description: str | None = None
+    area: str | None = None
+    image_url: str | None = None
+    member_count: int = 0
+    visibility: str
+
+
+class ChatRoomOpenRequest(BaseModel):
+    user_id: str
+    marketplace_item_id: str
+
+
+class ChatRoomResponse(BaseModel):
+    id: str
+    marketplace_item_id: str
+    buyer_id: str
+    seller_id: str
+    item_image: str | None = None
+    item_name: str
+    quantity: str | None = None
+    listing_type: str
+    owner_name: str
+    other_user_name: str
+    last_message: str | None = None
+    last_message_time: str | None = None
+    unread_count: int = 0
+
+
+class ChatMessageCreateRequest(BaseModel):
+    sender_id: str
+    message: str
+
+
+class ChatReadRequest(BaseModel):
+    user_id: str
+
+
+class ChatMessageResponse(BaseModel):
+    id: str
+    chat_room_id: str
+    sender_id: str
+    message: str
+    is_read: bool
+    created_at: str
+
+
+class PlantDiagnosisHistoryResponse(BaseModel):
+    id: str
+    status: str
+    disease_name: str | None = None
+    confidence: float
+    recommendation: str | None = None
+    image_url: str | None = None
+    created_at: str

@@ -10,7 +10,7 @@ This document describes the proposed database structure for KebunKita. The schem
 - Enforce hackathon-day access limits.
 - Track plants, care tasks, care history, and diagnosis history.
 - Support community posts, comments, and media.
-- Support marketplace listings, barter offers, trades, and chat.
+- Support marketplace listings, barter offers, trades, chat rooms, and realtime messages.
 - Store Firebase Cloud Messaging device tokens for push notifications.
 - Store Memory Core entries from agents.
 - Keep the schema simple enough for MVP but expandable for production.
@@ -24,7 +24,8 @@ erDiagram
     USERS ||--o{ COMMUNITY_POSTS : creates
     USERS ||--o{ MARKETPLACE_LISTINGS : lists
     USERS ||--o{ TRADES : participates
-    USERS ||--o{ CHAT_MESSAGES : sends
+    USERS ||--o{ CHAT_ROOMS : participates
+    USERS ||--o{ MESSAGES : sends
     USERS ||--o{ MEMORY_ENTRIES : owns
     USERS ||--o{ DEVICE_TOKENS : registers
     USERS ||--o{ NOTIFICATIONS : receives
@@ -44,7 +45,8 @@ erDiagram
 
     MARKETPLACE_LISTINGS ||--o{ LISTING_MEDIA : has
     MARKETPLACE_LISTINGS ||--o{ TRADES : requested_in
-    TRADES ||--o{ CHAT_MESSAGES : discusses
+    MARKETPLACE_LISTINGS ||--o{ CHAT_ROOMS : starts
+    CHAT_ROOMS ||--o{ MESSAGES : contains
 ```
 
 ## Naming Conventions
@@ -133,23 +135,24 @@ Stores user plants in My Garden.
 | --- | --- | --- |
 | id | uuid primary key | Plant id |
 | user_id | uuid foreign key users.id | Owner |
+| community_id | uuid foreign key communities.id nullable | Optional linked community |
 | name | text | Example: Cherry Tomato |
-| plant_type | text | `vegetable`, `fruit`, `herb`, `leafy_green` |
-| variety | text nullable | Example: Bird's Eye Chili |
-| photo_url | text nullable | Main plant image |
-| date_planted | date nullable | Date planted |
-| garden_location | text nullable | Example: South Sector, Row 4 |
-| growth_percent | integer default 0 | 0 to 100 |
-| status | text | `active`, `harvested`, `archived` |
-| sunlight_requirement | text nullable | `full_sun`, `partial`, `shade` |
+| category | text | `vegetable`, `fruit`, `herb`, `leafy_green`, `flower`, `other` |
+| image_url | text nullable | Main plant image |
+| planted_date | date nullable | Date planted |
+| location | text nullable | Example: South Sector, Row 4 |
+| sunlight | text nullable | `full_sun`, `partial_shade`, `shade` |
 | watering_frequency | text nullable | `daily`, `every_2_days`, `weekly` |
-| next_watering_at | timestamptz nullable | Reminder schedule |
+| growth_percentage | integer default 0 | 0 to 100 |
+| estimated_harvest_date | date nullable | Expected harvest date |
+| status | text | `active`, `harvested`, `archived` |
 | created_at | timestamptz | Creation time |
 | updated_at | timestamptz | Last update time |
 
 Recommended indexes:
 
 - `plants_user_id_idx`
+- `plants_community_id_idx`
 - `plants_status_idx`
 
 ### plant_media
@@ -166,42 +169,35 @@ Stores plant journey album images and videos.
 | caption | text nullable | Optional caption |
 | created_at | timestamptz | Creation time |
 
-### care_tasks
+### care_logs
 
-Stores planned care tasks.
+Stores completed plant-care actions.
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| id | uuid primary key | Task id |
-| user_id | uuid foreign key users.id | Owner |
-| plant_id | uuid foreign key plants.id nullable | Related plant |
-| task_time | time nullable | Suggested time |
-| task_name | text | Example: Water Cherry Tomato |
-| reason | text | Why this task matters |
-| status | text | `pending`, `done`, `skipped`, `expired` |
-| due_at | timestamptz nullable | Due date/time |
-| source_agent | text nullable | Example: `smart_farming` |
+| id | uuid primary key | Log id |
+| plant_id | uuid foreign key plants.id | Related plant |
+| action_type | text | `watered`, `fertilized`, `note`, `inspected`, `diagnosed` |
+| note | text nullable | Optional note |
 | created_at | timestamptz | Creation time |
-| updated_at | timestamptz | Last update time |
 
 Recommended indexes:
 
-- `care_tasks_user_due_idx` on `user_id`, `due_at`
-- `care_tasks_status_idx`
+- `care_logs_plant_id_idx`
+- `care_logs_action_type_idx`
+- `care_logs_created_at_idx`
 
-### care_history
+### care_reminders
 
-Stores completed care actions.
+Stores scheduled plant-care reminders.
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| id | uuid primary key | History id |
-| user_id | uuid foreign key users.id | Owner |
+| id | uuid primary key | Reminder id |
 | plant_id | uuid foreign key plants.id | Related plant |
-| action_type | text | `watered`, `fertilized`, `inspected`, `diagnosed` |
-| amount | text nullable | Example: 500ml |
-| notes | text nullable | Optional notes |
-| recorded_at | timestamptz | When action happened |
+| reminder_type | text | `water`, `fertilizer`, `inspection`, `harvest`, `custom` |
+| due_time | timestamptz | Reminder due time |
+| status | text | `pending`, `sent`, `done`, `skipped`, `expired` |
 | created_at | timestamptz | Creation time |
 
 ### plant_diagnoses
@@ -391,9 +387,43 @@ Recommended indexes:
 - `trades_owner_id_idx`
 - `trades_status_idx`
 
+### chat_rooms
+
+Stores direct marketplace conversations between an interested buyer and the listing owner.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | uuid primary key | Chat room id |
+| marketplace_item_id | uuid foreign key marketplace_listings.id | Listing being discussed |
+| buyer_id | uuid foreign key users.id | Interested user |
+| seller_id | uuid foreign key users.id | Listing owner |
+| created_at | timestamptz | Creation time |
+| updated_at | timestamptz | Last activity time |
+
+Recommended constraints:
+
+- Unique key on `marketplace_item_id`, `buyer_id`, `seller_id`.
+
+### messages
+
+Stores direct marketplace chat messages for a chat room.
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| id | uuid primary key | Message id |
+| chat_room_id | uuid foreign key chat_rooms.id | Related room |
+| sender_id | uuid foreign key users.id | Sender |
+| message | text | Message body |
+| is_read | boolean | Simple unread state |
+| created_at | timestamptz | Creation time |
+
+Recommended indexes:
+
+- `messages_chat_room_id_created_at_idx` on `chat_room_id`, `created_at`
+
 ### chat_messages
 
-Stores trade or community chat messages.
+Legacy trade chat table from the older barter flow. Keep only if you still need the previous trade-specific conversation design.
 
 | Column | Type | Notes |
 | --- | --- | --- |
@@ -463,7 +493,7 @@ Stores reminders and app notifications.
 | notification_type | text | `care_reminder`, `trade_update`, `community`, `system` |
 | title | text | Notification title |
 | body | text | Notification body |
-| related_table | text nullable | Example: `care_tasks` |
+| related_table | text nullable | Example: `care_reminders` |
 | related_id | uuid nullable | Related record id |
 | fcm_message_id | text nullable | Response id from Firebase Cloud Messaging |
 | error_message | text nullable | Send failure reason |
@@ -479,16 +509,17 @@ Build these first:
 1. `users`
 2. `guest_usage`
 3. `plants`
-4. `care_tasks`
-5. `care_history`
+4. `care_logs`
+5. `care_reminders`
 6. `plant_diagnoses`
 7. `community_posts`
 8. `marketplace_listings`
 9. `trades`
-10. `chat_messages`
-11. `memory_entries`
-12. `device_tokens`
-13. `notifications`
+10. `chat_rooms`
+11. `messages`
+12. `memory_entries`
+13. `device_tokens`
+14. `notifications`
 
 Add later:
 
@@ -511,7 +542,8 @@ If using Supabase:
 - Store images in Supabase Storage buckets.
 - Store Firebase Cloud Messaging tokens in `device_tokens`.
 - Use Supabase Edge Functions or a Laravel/backend service to send server-side requests to FCM.
-- Use policies so users can only access their own plants, care logs, diagnoses, chats, and memory.
+- Use policies so users can only access their own plants, care logs, diagnoses, chat rooms, messages, and memory.
+- Enable Supabase Realtime on `messages` so marketplace chats update instantly during the demo.
 - Public community posts and marketplace listings can have broader read access.
 
 Suggested storage buckets:
@@ -532,6 +564,8 @@ How to use:
 3. Paste the full SQL from `SUPABASE_SCHEMA.sql`.
 4. Run the script.
 5. Confirm tables, indexes, storage buckets, and RLS policies are created.
+
+If your Supabase database was already created with the older smart-farming schema, run `SUPABASE_MY_GARDEN_UPDATE.sql` instead of recreating the database. That migration adds the new My Garden fields and creates `care_logs` and `care_reminders`.
 
 The schema also creates an auth trigger so new Supabase Auth users are copied into `public.users` with the same `id`. This is important because the RLS policies compare `auth.uid()` with table `user_id` values.
 
@@ -569,4 +603,4 @@ Flow:
 - Guest data should expire after the event.
 - Uploaded plant images should be treated as user data.
 - Location should be stored as text for MVP unless precise coordinates are required.
-- Chat messages and trade records should only be visible to involved users.
+- Chat rooms, messages, and trade records should only be visible to involved users.

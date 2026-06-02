@@ -11,6 +11,7 @@ from backend.models.schemas import (
     GuardrailsResponse,
     HarvestResponse,
     MemoryLookupResponse,
+    PlantDiagnosisHistoryResponse,
     PlantHealthResponse,
     SmartFarmingResponse,
 )
@@ -62,7 +63,7 @@ async def smart_farming(
 ):
     ensure_access(user_id, "smart_farming", "generate_task")
     result = agent_supervisor.create_farming_plan(user_id=user_id, plant_name=plant_name, budget_rm=budget_rm)
-    _persist_care_tasks(user_id=user_id, plant_name=plant_name, tasks=result["tasks"])
+    _persist_care_reminder_hints(user_id=user_id, plant_name=plant_name, tasks=result["tasks"])
     return SmartFarmingResponse(
         user_id=user_id,
         plant_name=plant_name,
@@ -111,6 +112,47 @@ async def get_memory(user_id: str):
     return MemoryLookupResponse(user_id=user_id, history=memory_core_agent.history(user_id))
 
 
+@router.get("/plant-health/history/{user_id}", response_model=list[PlantDiagnosisHistoryResponse])
+async def get_plant_health_history(user_id: str):
+    if supabase_client.is_configured():
+        try:
+            rows = supabase_client.select("plant_diagnoses", filters={"user_id": user_id}, order="created_at.desc", limit=12)
+            return [
+                PlantDiagnosisHistoryResponse(
+                    id=row["id"],
+                    status=row.get("status", "unknown"),
+                    disease_name=row.get("disease_name"),
+                    confidence=float(row.get("confidence") or 0),
+                    recommendation=row.get("recommendation"),
+                    image_url=row.get("image_url"),
+                    created_at=row["created_at"].isoformat() if hasattr(row.get("created_at"), "isoformat") else str(row.get("created_at") or ""),
+                )
+                for row in rows
+            ]
+        except SupabaseError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    history = memory_core_agent.history(user_id)
+    diagnoses = []
+    for entry in history:
+        if entry.get("agent_name") != "plant_health":
+            continue
+        payload = entry.get("payload", {})
+        result = payload.get("result", {})
+        diagnoses.append(
+            PlantDiagnosisHistoryResponse(
+                id=str(entry.get("id") or payload.get("image_name") or len(diagnoses)),
+                status=result.get("status", "unknown"),
+                disease_name=result.get("disease_name"),
+                confidence=float(result.get("confidence") or 0),
+                recommendation=result.get("recommendation"),
+                image_url=None,
+                created_at=str(entry.get("created_at") or ""),
+            )
+        )
+    return diagnoses[:12]
+
+
 @router.get("/guardrails", response_model=GuardrailsResponse)
 async def guardrails():
     return GuardrailsResponse(**describe_guardrails())
@@ -138,24 +180,10 @@ def _persist_plant_diagnosis(user_id: str, image_url: str | None, result: dict) 
         pass
 
 
-def _persist_care_tasks(user_id: str, plant_name: str, tasks: list[dict]) -> None:
-    if not supabase_client.is_configured() or not tasks:
-        return
-    payload = [
-        {
-            "user_id": user_id,
-            "task_time": task.get("time"),
-            "task_name": task.get("task") or f"Care for {plant_name}",
-            "reason": task.get("reason"),
-            "status": "pending",
-            "source_agent": "smart_farming",
-        }
-        for task in tasks
-    ]
-    try:
-        supabase_client.insert("care_tasks", payload)
-    except SupabaseError:
-        pass
+def _persist_care_reminder_hints(user_id: str, plant_name: str, tasks: list[dict]) -> None:
+    # The new care_reminders table is plant-first and requires plant_id.
+    # Generic agent suggestions stay in memory until the user attaches them to a plant.
+    return
 
 
 def _persist_community_post(user_id: str, title: str, quantity: str, location: str | None) -> str:

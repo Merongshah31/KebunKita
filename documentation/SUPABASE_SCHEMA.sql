@@ -134,21 +134,21 @@ create index if not exists device_tokens_is_active_idx on public.device_tokens(i
 create table if not exists public.plants (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on delete cascade,
+  community_id uuid,
   name text not null,
-  plant_type text not null
-    check (plant_type in ('vegetable', 'fruit', 'herb', 'leafy_green', 'other')),
-  variety text,
-  photo_url text,
-  date_planted date,
-  garden_location text,
-  growth_percent integer not null default 0 check (growth_percent >= 0 and growth_percent <= 100),
-  status text not null default 'active'
-    check (status in ('active', 'harvested', 'archived')),
-  sunlight_requirement text
-    check (sunlight_requirement is null or sunlight_requirement in ('full_sun', 'partial', 'shade')),
+  category text not null
+    check (category in ('vegetable', 'fruit', 'herb', 'leafy_green', 'flower', 'other')),
+  image_url text,
+  planted_date date,
+  location text,
+  sunlight text
+    check (sunlight is null or sunlight in ('full_sun', 'partial_shade', 'shade')),
   watering_frequency text
     check (watering_frequency is null or watering_frequency in ('daily', 'every_2_days', 'weekly')),
-  next_watering_at timestamptz,
+  growth_percentage integer not null default 0 check (growth_percentage >= 0 and growth_percentage <= 100),
+  estimated_harvest_date date,
+  status text not null default 'active'
+    check (status in ('active', 'harvested', 'archived')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -158,6 +158,7 @@ before update on public.plants
 for each row execute function public.set_updated_at();
 
 create index if not exists plants_user_id_idx on public.plants(user_id);
+create index if not exists plants_community_id_idx on public.plants(community_id);
 create index if not exists plants_status_idx on public.plants(status);
 
 create table if not exists public.plant_media (
@@ -173,44 +174,33 @@ create table if not exists public.plant_media (
 create index if not exists plant_media_plant_id_idx on public.plant_media(plant_id);
 create index if not exists plant_media_user_id_idx on public.plant_media(user_id);
 
-create table if not exists public.care_tasks (
+create table if not exists public.care_logs (
   id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references public.users(id) on delete cascade,
-  plant_id uuid references public.plants(id) on delete set null,
-  task_time time,
-  task_name text not null,
-  reason text,
-  status text not null default 'pending'
-    check (status in ('pending', 'done', 'skipped', 'expired')),
-  due_at timestamptz,
-  source_agent text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create trigger care_tasks_set_updated_at
-before update on public.care_tasks
-for each row execute function public.set_updated_at();
-
-create index if not exists care_tasks_user_due_idx on public.care_tasks(user_id, due_at);
-create index if not exists care_tasks_status_idx on public.care_tasks(status);
-create index if not exists care_tasks_plant_id_idx on public.care_tasks(plant_id);
-
-create table if not exists public.care_history (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references public.users(id) on delete cascade,
   plant_id uuid not null references public.plants(id) on delete cascade,
   action_type text not null
-    check (action_type in ('watered', 'fertilized', 'inspected', 'diagnosed')),
-  amount text,
-  notes text,
-  recorded_at timestamptz not null default now(),
+    check (action_type in ('watered', 'fertilized', 'note', 'inspected', 'diagnosed')),
+  note text,
   created_at timestamptz not null default now()
 );
 
-create index if not exists care_history_user_id_idx on public.care_history(user_id);
-create index if not exists care_history_plant_id_idx on public.care_history(plant_id);
-create index if not exists care_history_recorded_at_idx on public.care_history(recorded_at);
+create index if not exists care_logs_plant_id_idx on public.care_logs(plant_id);
+create index if not exists care_logs_action_type_idx on public.care_logs(action_type);
+create index if not exists care_logs_created_at_idx on public.care_logs(created_at);
+
+create table if not exists public.care_reminders (
+  id uuid primary key default gen_random_uuid(),
+  plant_id uuid not null references public.plants(id) on delete cascade,
+  reminder_type text not null
+    check (reminder_type in ('water', 'fertilizer', 'inspection', 'harvest', 'custom')),
+  due_time timestamptz not null,
+  status text not null default 'pending'
+    check (status in ('pending', 'sent', 'done', 'skipped', 'expired')),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists care_reminders_plant_id_idx on public.care_reminders(plant_id);
+create index if not exists care_reminders_due_time_idx on public.care_reminders(due_time);
+create index if not exists care_reminders_status_idx on public.care_reminders(status);
 
 create table if not exists public.plant_diagnoses (
   id uuid primary key default gen_random_uuid(),
@@ -254,6 +244,19 @@ for each row execute function public.set_updated_at();
 
 create index if not exists communities_created_by_idx on public.communities(created_by);
 create index if not exists communities_visibility_idx on public.communities(visibility);
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'plants_community_id_fkey'
+  ) then
+    alter table public.plants
+      add constraint plants_community_id_fkey
+      foreign key (community_id) references public.communities(id) on delete set null;
+  end if;
+end $$;
 
 create table if not exists public.community_members (
   id uuid primary key default gen_random_uuid(),
@@ -396,6 +399,38 @@ create index if not exists trades_requester_id_idx on public.trades(requester_id
 create index if not exists trades_owner_id_idx on public.trades(owner_id);
 create index if not exists trades_status_idx on public.trades(status);
 
+create table if not exists public.chat_rooms (
+  id uuid primary key default gen_random_uuid(),
+  marketplace_item_id uuid not null references public.marketplace_listings(id) on delete cascade,
+  buyer_id uuid not null references public.users(id) on delete cascade,
+  seller_id uuid not null references public.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (marketplace_item_id, buyer_id, seller_id)
+);
+
+create trigger chat_rooms_set_updated_at
+before update on public.chat_rooms
+for each row execute function public.set_updated_at();
+
+create index if not exists chat_rooms_marketplace_item_id_idx on public.chat_rooms(marketplace_item_id);
+create index if not exists chat_rooms_buyer_id_idx on public.chat_rooms(buyer_id);
+create index if not exists chat_rooms_seller_id_idx on public.chat_rooms(seller_id);
+create index if not exists chat_rooms_updated_at_idx on public.chat_rooms(updated_at desc);
+
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  chat_room_id uuid not null references public.chat_rooms(id) on delete cascade,
+  sender_id uuid not null references public.users(id) on delete cascade,
+  message text not null,
+  is_read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists messages_chat_room_id_created_at_idx on public.messages(chat_room_id, created_at);
+create index if not exists messages_sender_id_idx on public.messages(sender_id);
+create index if not exists messages_is_read_idx on public.messages(is_read);
+
 create table if not exists public.chat_messages (
   id uuid primary key default gen_random_uuid(),
   trade_id uuid references public.trades(id) on delete cascade,
@@ -493,8 +528,8 @@ alter table public.guest_usage enable row level security;
 alter table public.device_tokens enable row level security;
 alter table public.plants enable row level security;
 alter table public.plant_media enable row level security;
-alter table public.care_tasks enable row level security;
-alter table public.care_history enable row level security;
+alter table public.care_logs enable row level security;
+alter table public.care_reminders enable row level security;
 alter table public.plant_diagnoses enable row level security;
 alter table public.communities enable row level security;
 alter table public.community_members enable row level security;
@@ -505,6 +540,8 @@ alter table public.post_reactions enable row level security;
 alter table public.marketplace_listings enable row level security;
 alter table public.listing_media enable row level security;
 alter table public.trades enable row level security;
+alter table public.chat_rooms enable row level security;
+alter table public.messages enable row level security;
 alter table public.chat_messages enable row level security;
 alter table public.memory_entries enable row level security;
 alter table public.agent_runs enable row level security;
@@ -542,15 +579,39 @@ on public.plant_media for all
 using (auth.uid() = user_id)
 with check (auth.uid() = user_id);
 
-create policy "users can manage own care tasks"
-on public.care_tasks for all
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
+create policy "users can manage care logs for own plants"
+on public.care_logs for all
+using (
+  exists (
+    select 1 from public.plants
+    where plants.id = care_logs.plant_id
+      and plants.user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1 from public.plants
+    where plants.id = care_logs.plant_id
+      and plants.user_id = auth.uid()
+  )
+);
 
-create policy "users can manage own care history"
-on public.care_history for all
-using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
+create policy "users can manage reminders for own plants"
+on public.care_reminders for all
+using (
+  exists (
+    select 1 from public.plants
+    where plants.id = care_reminders.plant_id
+      and plants.user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1 from public.plants
+    where plants.id = care_reminders.plant_id
+      and plants.user_id = auth.uid()
+  )
+);
 
 create policy "users can manage own diagnoses"
 on public.plant_diagnoses for all
@@ -630,6 +691,57 @@ create policy "trade participants can update trades"
 on public.trades for update
 using (auth.uid() = requester_id or auth.uid() = owner_id);
 
+create policy "marketplace participants can read chat rooms"
+on public.chat_rooms for select
+using (auth.uid() = buyer_id or auth.uid() = seller_id);
+
+create policy "buyers can create their chat rooms"
+on public.chat_rooms for insert
+with check (auth.uid() = buyer_id);
+
+create policy "chat participants can update chat rooms"
+on public.chat_rooms for update
+using (auth.uid() = buyer_id or auth.uid() = seller_id)
+with check (auth.uid() = buyer_id or auth.uid() = seller_id);
+
+create policy "chat participants can read messages"
+on public.messages for select
+using (
+  exists (
+    select 1 from public.chat_rooms
+    where chat_rooms.id = messages.chat_room_id
+      and (chat_rooms.buyer_id = auth.uid() or chat_rooms.seller_id = auth.uid())
+  )
+);
+
+create policy "chat participants can send messages"
+on public.messages for insert
+with check (
+  auth.uid() = sender_id
+  and exists (
+    select 1 from public.chat_rooms
+    where chat_rooms.id = messages.chat_room_id
+      and (chat_rooms.buyer_id = auth.uid() or chat_rooms.seller_id = auth.uid())
+  )
+);
+
+create policy "chat participants can update read state"
+on public.messages for update
+using (
+  exists (
+    select 1 from public.chat_rooms
+    where chat_rooms.id = messages.chat_room_id
+      and (chat_rooms.buyer_id = auth.uid() or chat_rooms.seller_id = auth.uid())
+  )
+)
+with check (
+  exists (
+    select 1 from public.chat_rooms
+    where chat_rooms.id = messages.chat_room_id
+      and (chat_rooms.buyer_id = auth.uid() or chat_rooms.seller_id = auth.uid())
+  )
+);
+
 create policy "trade participants can read messages"
 on public.chat_messages for select
 using (
@@ -675,3 +787,16 @@ using (bucket_id = 'marketplace-media');
 create policy "public can read avatars"
 on storage.objects for select
 using (bucket_id = 'avatars');
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'messages'
+  ) then
+    alter publication supabase_realtime add table public.messages;
+  end if;
+end $$;
