@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { apiService } from '../api/client';
 import '../styles/agents.css';
 
@@ -15,7 +15,7 @@ export default function PlantHealth({ userId, onError }) {
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState('');
 
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     setHistoryLoading(true);
     setHistoryError('');
     try {
@@ -27,11 +27,11 @@ export default function PlantHealth({ userId, onError }) {
     } finally {
       setHistoryLoading(false);
     }
-  };
+  }, [userId]);
 
   useEffect(() => {
     fetchHistory();
-  }, [userId]);
+  }, [fetchHistory]);
 
   const handleImageSelect = (event) => {
     const file = event.target.files[0];

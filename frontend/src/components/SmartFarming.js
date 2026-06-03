@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiService } from '../api/client';
 import '../styles/agents.css';
 
@@ -65,7 +65,7 @@ export default function SmartFarming({ userId, onError }) {
   const visiblePlants = useMemo(() => plants.map(normalizePlant), [plants]);
   const activePlant = selectedPlant ? normalizePlant(selectedPlant) : null;
 
-  const refreshPlants = async () => {
+  const refreshPlants = useCallback(async () => {
     setPlantsLoading(true);
     setPlantsError('');
     try {
@@ -84,13 +84,13 @@ export default function SmartFarming({ userId, onError }) {
     } finally {
       setPlantsLoading(false);
     }
-  };
+  }, [onError, userId]);
 
   useEffect(() => {
     refreshPlants();
-  }, [userId]);
+  }, [refreshPlants]);
 
-  const refreshCareLogs = async (plantId) => {
+  const refreshCareLogs = useCallback(async (plantId) => {
     if (!plantId) {
       setCareLogs([]);
       return;
@@ -105,13 +105,13 @@ export default function SmartFarming({ userId, onError }) {
     } finally {
       setCareLogsLoading(false);
     }
-  };
+  }, [onError, userId]);
 
   useEffect(() => {
     if (selectedPlant?.id) {
       refreshCareLogs(selectedPlant.id);
     }
-  }, [selectedPlant?.id]);
+  }, [refreshCareLogs, selectedPlant?.id]);
 
   const updateForm = (field, value) => {
     setForm((current) => ({ ...current, [field]: value }));

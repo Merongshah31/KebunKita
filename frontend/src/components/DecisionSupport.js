@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { apiService } from '../api/client';
 import '../styles/agents.css';
 
@@ -14,7 +14,7 @@ export default function DecisionSupport({ userId, onError }) {
   const [historyError, setHistoryError] = useState('');
   const endRef = useRef(null);
 
-  const loadHistory = async () => {
+  const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
     setHistoryError('');
     try {
@@ -45,11 +45,11 @@ export default function DecisionSupport({ userId, onError }) {
     } finally {
       setHistoryLoading(false);
     }
-  };
+  }, [userId]);
 
   React.useEffect(() => {
     loadHistory();
-  }, [userId]);
+  }, [loadHistory]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
