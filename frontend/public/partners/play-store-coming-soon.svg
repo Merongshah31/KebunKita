@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="210" height="64" viewBox="0 0 210 64" role="img" aria-labelledby="title desc">
+  <title id="title">Google Play coming soon</title>
+  <desc id="desc">Coming soon badge for Android on Google Play</desc>
+  <rect width="210" height="64" rx="14" fill="#173c26"/>
+  <path d="M28 18.5v27c0 1.4 1.5 2.3 2.8 1.6l15.5-8.7-16-17.8c-1.1-1.2-2.3-.5-2.3 1z" fill="#42d87b"/>
+  <path d="M31.4 17.6 47.7 35l5.4-3c1.7-.9 1.7-3.2 0-4.1L34.2 17.3c-1.2-.7-2.1-.4-2.8.3z" fill="#8be67d"/>
+  <path d="m47.7 35-16.3 17.4c.7.7 1.6 1 2.8.3l18.9-10.6c1.7-.9 1.7-3.2 0-4.1l-5.4-3z" fill="#f0cf45"/>
+  <text x="68" y="25" fill="#dfeadb" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="700">COMING SOON ON</text>
+  <text x="68" y="45" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="900">Google Play</text>
+</svg>

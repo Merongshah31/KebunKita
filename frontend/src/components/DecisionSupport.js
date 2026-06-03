@@ -3,23 +3,61 @@ import { apiService } from '../api/client';
 import '../styles/agents.css';
 
 export default function DecisionSupport({ userId, onError }) {
-  const [budgetRm, setBudgetRm] = useState('80');
-  const [timelineWeeks, setTimelineWeeks] = useState('8');
-  const [space, setSpace] = useState('Apartment balcony with morning sun');
-  const [goal, setGoal] = useState('Grow fast vegetables for weekly cooking');
-  const [message, setMessage] = useState('What should I grow next in a small balcony?');
-  const [messages, setMessages] = useState([
-    {
-      role: 'advisor',
-      content: 'Tell me your budget, timeline, space, and goal. I will suggest a practical growing plan.',
-    },
-  ]);
+  const [budgetRm, setBudgetRm] = useState('');
+  const [timelineWeeks, setTimelineWeeks] = useState('');
+  const [space, setSpace] = useState('');
+  const [goal, setGoal] = useState('');
+  const [message, setMessage] = useState('');
+  const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState('');
   const endRef = useRef(null);
+
+  const loadHistory = async () => {
+    setHistoryLoading(true);
+    setHistoryError('');
+    try {
+      const response = await apiService.getMemory(userId);
+      const items = Array.isArray(response.data?.history) ? response.data.history : [];
+      const historyMessages = items
+        .filter((entry) => entry.agent_name === 'decision_support')
+        .flatMap((entry) => {
+          const payload = entry.payload || {};
+          const nextMessages = [];
+          if (payload.chat_message) {
+            nextMessages.push({ role: 'user', content: payload.chat_message });
+          }
+          if (payload.answer) {
+            nextMessages.push({
+              role: 'advisor',
+              content: payload.answer,
+              recommendations: payload.recommendations || [],
+            });
+          }
+          return nextMessages;
+        })
+        .reverse();
+      setMessages(historyMessages);
+    } catch (error) {
+      setMessages([]);
+      setHistoryError(error.debugInfo?.message || error.message);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    loadHistory();
+  }, [userId]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!message.trim()) return;
+    if (!budgetRm || !timelineWeeks || !space.trim() || !goal.trim()) {
+      onError('Fill in budget, timeline, space, and goal before sending a live advisor question.');
+      return;
+    }
 
     const userMessage = { role: 'user', content: message };
     setMessages((current) => [...current, userMessage]);
@@ -34,14 +72,12 @@ export default function DecisionSupport({ userId, onError }) {
         goal,
         chatMessage: message,
       });
-      setMessages((current) => [
-        ...current,
-        {
-          role: 'advisor',
-          content: response.data.answer,
-          recommendations: response.data.recommendations,
-        },
-      ]);
+      setMessages((current) => [...current, {
+        role: 'advisor',
+        content: response.data.answer,
+        recommendations: response.data.recommendations,
+      }]);
+      await loadHistory();
       window.setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
     } catch (error) {
       onError(`Advisor failed: ${error.debugInfo?.message || error.message}`);
@@ -80,7 +116,13 @@ export default function DecisionSupport({ userId, onError }) {
       </div>
 
       <div className="chat-window">
-        {messages.map((item, index) => (
+        {historyLoading ? (
+          <div className="chat-message advisor">Loading advisor history...</div>
+        ) : historyError ? (
+          <div className="chat-message advisor">Could not load advisor history: {historyError}</div>
+        ) : messages.length === 0 ? (
+          <div className="chat-message advisor">No advisor history yet. Send a live question to start.</div>
+        ) : messages.map((item, index) => (
           <div className={`chat-message ${item.role}`} key={`${item.role}-${index}`}>
             <p>{item.content}</p>
             {item.recommendations && (

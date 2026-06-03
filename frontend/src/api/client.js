@@ -53,6 +53,8 @@ export const apiService = {
       notes,
     }),
 
+  getPlantHealthHistory: (userId) => apiClient.get(`/api/agents/plant-health/history/${userId}`),
+
   createFarmingPlan: (userId, plantName, budgetRm = '') =>
     formPost('/api/agents/smart-farming', {
       user_id: userId,
@@ -81,6 +83,40 @@ export const apiService = {
   listPlants: (userId) => apiClient.get('/api/plants', { params: { user_id: userId } }),
 
   createPlant: (payload) => apiClient.post('/api/plants', payload),
+
+  deletePlant: (plantId, userId) => apiClient.delete(`/api/plants/${plantId}`, { params: { user_id: userId } }),
+
+  listCareLogs: (plantId, userId) => apiClient.get(`/api/plants/${plantId}/care-logs`, { params: { user_id: userId } }),
+
+  createCareLog: (plantId, payload) => apiClient.post(`/api/plants/${plantId}/care-logs`, payload),
+
+  listCommunityFeed: () => apiClient.get('/api/community/feed'),
+
+  listCommunities: () => apiClient.get('/api/community/communities'),
+
+  createCommunityPost: (payload) => formPost('/api/community/feed', payload),
+
+  listMarketplace: () => apiClient.get('/api/community/marketplace'),
+
+  createMarketplaceListing: (payload) => apiClient.post('/api/community/marketplace', payload),
+
+  deleteMarketplaceListing: (listingId, userId) =>
+    apiClient.delete(`/api/community/marketplace/${listingId}`, { params: { user_id: userId } }),
+
+  getMarketplaceChatReply: (payload) => apiClient.post('/api/chatbot/reply', payload),
+
+  listChatRooms: (userId) => apiClient.get('/api/community/chats', { params: { user_id: userId } }),
+
+  openMarketplaceChat: (payload) => apiClient.post('/api/community/chats/open', payload),
+
+  listChatMessages: (chatRoomId, userId) =>
+    apiClient.get(`/api/community/chats/${chatRoomId}/messages`, { params: { user_id: userId } }),
+
+  sendChatMessage: (chatRoomId, payload) =>
+    apiClient.post(`/api/community/chats/${chatRoomId}/messages`, payload),
+
+  markChatRead: (chatRoomId, userId) =>
+    apiClient.post(`/api/community/chats/${chatRoomId}/read`, { user_id: userId }),
 
   waterPlant: (plantId, userId, amount = '500ml') =>
     apiClient.post(`/api/plants/${plantId}/water`, {

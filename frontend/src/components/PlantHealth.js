@@ -1,13 +1,37 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { apiService } from '../api/client';
 import '../styles/agents.css';
+
+const plantTypeOptions = ['Chili', 'Tomato', 'Kangkung', 'Spinach', 'Herbs', 'Other'];
 
 export default function PlantHealth({ userId, onError }) {
   const [imageFile, setImageFile] = useState(null);
   const [preview, setPreview] = useState('');
-  const [notes, setNotes] = useState('Brown spots on chili leaves');
+  const [plantType, setPlantType] = useState('Chili');
+  const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState('');
+
+  const fetchHistory = async () => {
+    setHistoryLoading(true);
+    setHistoryError('');
+    try {
+      const response = await apiService.getPlantHealthHistory(userId);
+      setHistory(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      setHistory([]);
+      setHistoryError(error.debugInfo?.message || error.message);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchHistory();
+  }, [userId]);
 
   const handleImageSelect = (event) => {
     const file = event.target.files[0];
@@ -24,8 +48,10 @@ export default function PlantHealth({ userId, onError }) {
 
     setLoading(true);
     try {
-      const response = await apiService.analyzePlant(userId, imageFile, notes);
+      const combinedNotes = [`Plant type: ${plantType}`, notes].filter(Boolean).join('\n');
+      const response = await apiService.analyzePlant(userId, imageFile, combinedNotes);
       setResult(response.data);
+      await fetchHistory();
     } catch (error) {
       onError(`Plant analysis failed: ${error.debugInfo?.message || error.message}`);
     } finally {
@@ -38,7 +64,10 @@ export default function PlantHealth({ userId, onError }) {
       <div className="agent-title">
         <div>
           <span className="agent-kicker">AI plant health</span>
-          <h3>Upload a leaf photo</h3>
+          <h3>Plant Health</h3>
+          <p className="agent-subtitle">
+            Upload a plant or leaf photo to detect possible plant health issues.
+          </p>
         </div>
         <span className="agent-badge">YOLOv8 + DeepSeek</span>
       </div>
@@ -48,9 +77,20 @@ export default function PlantHealth({ userId, onError }) {
           {preview ? (
             <img src={preview} alt="Selected plant preview" />
           ) : (
-            <span>Tap to choose a plant image</span>
+            <span>Tap to upload a plant or leaf photo</span>
           )}
           <input type="file" accept="image/*" onChange={handleImageSelect} />
+        </label>
+
+        <label>
+          Plant Type
+          <select value={plantType} onChange={(event) => setPlantType(event.target.value)}>
+            {plantTypeOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </label>
 
         <label>
@@ -68,18 +108,51 @@ export default function PlantHealth({ userId, onError }) {
       </form>
 
       {result && (
-        <ResultCard title="Diagnosis">
-          <div className="status-row">
-            <strong>{result.status}</strong>
-            <span>{Math.round((result.confidence || 0) * 100)} percent confidence</span>
+        <ResultCard title="Analysis Result">
+          <div className={`status-row status-row-${mapStatusTone(result.status)}`}>
+            <div>
+              <small className="result-label">Plant Status</small>
+              <strong>{mapStatusLabel(result.status)}</strong>
+            </div>
+            <span>{Math.round((result.confidence || 0) * 100)}% confidence</span>
           </div>
-          {result.disease_name && <p>{result.disease_name}</p>}
-          <List label="Symptoms" items={result.symptoms} />
-          <List label="Treatment" items={result.treatment_plan} />
-          <p>{result.recommendation}</p>
-          <small>{result.memory_ref}</small>
+
+          <div className="diagnosis-grid">
+            <InfoBlock label="Detected Issue" value={result.disease_name || 'No clear issue detected'} />
+            <InfoBlock label="Confidence Score" value={`${Math.round((result.confidence || 0) * 100)}%`} />
+          </div>
+
+          <section className="health-explanation-card">
+            <strong>AI Explanation</strong>
+            <p>{result.recommendation || 'The AI could not generate a full explanation for this image.'}</p>
+          </section>
+
+          {result.symptoms?.length > 0 && <List label="Observed Signals" items={result.symptoms} />}
+          <List label="Suggested Actions" items={result.treatment_plan} emptyText="No specific action suggested yet." />
+
+          <small className="result-disclaimer">
+            This is AI-assisted guidance, not a final expert diagnosis.
+          </small>
         </ResultCard>
       )}
+
+      <ResultCard title="Recent Analyses">
+        {historyLoading ? (
+          <p>Loading plant health history...</p>
+        ) : historyError ? (
+          <p>Could not load history: {historyError}</p>
+        ) : history.length === 0 ? (
+          <p>No diagnosis history yet. Upload a photo to create the first live record.</p>
+        ) : (
+          <div className="mini-list">
+            {history.map((entry) => (
+              <span key={entry.id}>
+                {mapStatusLabel(entry.status)}{entry.disease_name ? ` - ${entry.disease_name}` : ''} ({Math.round((entry.confidence || 0) * 100)}%)
+              </span>
+            ))}
+          </div>
+        )}
+      </ResultCard>
     </article>
   );
 }
@@ -93,8 +166,16 @@ function ResultCard({ title, children }) {
   );
 }
 
-function List({ label, items }) {
-  if (!items || items.length === 0) return null;
+function List({ label, items, emptyText }) {
+  if ((!items || items.length === 0) && !emptyText) return null;
+  if (!items || items.length === 0) {
+    return (
+      <div className="mini-list">
+        <strong>{label}</strong>
+        <span>{emptyText}</span>
+      </div>
+    );
+  }
   return (
     <div className="mini-list">
       <strong>{label}</strong>
@@ -103,4 +184,27 @@ function List({ label, items }) {
       ))}
     </div>
   );
+}
+
+function InfoBlock({ label, value }) {
+  return (
+    <div className="diagnosis-stat">
+      <small className="result-label">{label}</small>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function mapStatusLabel(status) {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'healthy') return 'Healthy';
+  if (normalized === 'diseased') return 'Possibly Unhealthy';
+  return 'Unknown';
+}
+
+function mapStatusTone(status) {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'healthy') return 'healthy';
+  if (normalized === 'diseased') return 'warning';
+  return 'unknown';
 }
